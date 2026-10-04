@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Docker Study Notes — Dasari Sindhu</title>
+</head>
+<body>
+
+<section class="cover">
+  <p class="kicker">Study notes</p>
+  <h1>Docker</h1>
+  <p class="subtitle">From first principles to a runnable full-stack application</p>
+  <p class="name">Dasari Sindhu</p>
+  <p class="meta">Software Engineer | AI/ML | Full-Stack</p>
+  <p class="meta">Bengaluru</p>
+  <p class="meta">LinkedIn: linkedin.com/in/dasari-sindhu</p>
+  <p class="meta">GitHub: github.com/sindhu0016</p>
+  <p class="small">A practical study guide. Concepts are explained in plain language, then shown with commands you can run. September 2026. Compose v2 uses docker compose with a space.</p>
+</section>
+
+<section class="toc">
+  <h1>Contents</h1>
+  <p>The chapters follow the order in which the ideas depend on each other. Each chapter starts on a new page.</p>
+  <ol>
+    <li>About Docker</li>
+    <li>Why Docker exists</li>
+    <li>How Docker actually works</li>
+    <li>Install and sanity-check</li>
+    <li>Images and containers</li>
+    <li>Your first containers</li>
+    <li>Essential commands</li>
+    <li>Writing a Dockerfile</li>
+    <li>The .dockerignore file</li>
+    <li>Layers, cache, and BuildKit</li>
+    <li>Multi-stage builds</li>
+    <li>Volumes and bind mounts</li>
+    <li>Networking</li>
+    <li>Environment, secrets, and config</li>
+    <li>Docker Compose</li>
+    <li>Health checks, restart, and logs</li>
+    <li>Pushing to a registry</li>
+    <li>Security basics</li>
+    <li>Debugging when things break</li>
+    <li>Mini project: FastAPI and React</li>
+    <li>Command reference</li>
+    <li>Interview questions</li>
+    <li>What to learn next</li>
+  </ol>
+</section>
+
+<p class="chapnum">Chapter 1</p>
+<h1>About Docker</h1>
+
+<div class="callout"><p><strong>Definition.</strong> Docker is a platform for packaging an application, together with the runtime and libraries it needs, into a standard unit called a container. The same package then runs on a laptop, in continuous integration, or on a server, as long as a Docker engine is present.</p></div>
+
+<p>A container is not a copy of an entire computer. It is a process, plus a private view of the filesystem, network, and process list. The host operating system kernel is shared. That is why a container starts in seconds and uses far less memory than a virtual machine, which must boot a second operating system.</p>
+
+<p>Docker was introduced in 2013 by Solomon Hykes and Docker, Inc. Linux already had the isolation features. Namespaces keep one container from seeing another container’s processes and network. Control groups, usually called cgroups, limit how much CPU and memory a container may use. Docker made those features usable through a command-line tool, an image format, and a registry. On macOS and Windows, Docker Desktop runs a small Linux virtual machine, and the engine lives inside it. The commands you type stay the same.</p>
+
+<h2>What Docker is, and what it is not</h2>
+<table>
+  <tr><th>Docker is</th><th>Docker is not</th></tr>
+  <tr><td>A way to package an application with its runtime so the result is repeatable.</td><td>A virtual machine. Containers share the host kernel.</td></tr>
+  <tr><td>The base skill for Compose, and later for Kubernetes.</td><td>Kubernetes. Kubernetes schedules many containers across many machines. Learn Docker first.</td></tr>
+  <tr><td>A tool for local development, build artifacts, and production images.</td><td>A repair for incorrect code. A broken application inside a container is still broken.</td></tr>
+</table>
+
+<h2>The pieces you will meet</h2>
+<table>
+  <tr><th>Piece</th><th>What it is</th><th>Chapter</th></tr>
+  <tr><td>Docker Engine</td><td>The background service, <code>dockerd</code>, that builds images and runs containers.</td><td>3</td></tr>
+  <tr><td>Docker CLI</td><td>The <code>docker</code> commands you type. The CLI talks to the engine.</td><td>7</td></tr>
+  <tr><td>Image</td><td>A read-only template: files, a default command, and metadata.</td><td>5</td></tr>
+  <tr><td>Container</td><td>A running or stopped instance created from an image.</td><td>5, 6</td></tr>
+  <tr><td>Dockerfile</td><td>The text recipe that builds an image.</td><td>8</td></tr>
+  <tr><td>Registry</td><td>A store for images, such as Docker Hub or GitHub Container Registry.</td><td>17</td></tr>
+  <tr><td>Compose</td><td>A YAML file that starts several containers as one application.</td><td>15</td></tr>
+</table>
+
+<h2>Official references</h2>
+<p>These notes are a study guide. The documents below are the canonical references when a flag or a file key is in doubt.</p>
+<table>
+  <tr><th>Document</th><th>What it covers</th></tr>
+  <tr><td>docs.docker.com</td><td>Platform overview and guides</td></tr>
+  <tr><td>docs.docker.com/get-docker</td><td>Install Docker Desktop or Engine</td></tr>
+  <tr><td>docs.docker.com/engine</td><td>Daemon, images, containers, storage, and networks</td></tr>
+  <tr><td>docs.docker.com/reference/dockerfile</td><td>Every Dockerfile instruction</td></tr>
+  <tr><td>docs.docker.com/build/building/best-practices</td><td>Layer cache, small images, non-root user</td></tr>
+  <tr><td>docs.docker.com/compose/compose-file</td><td>Compose file keys</td></tr>
+  <tr><td>docs.docker.com/reference/cli/docker</td><td>Every command and flag</td></tr>
+  <tr><td>hub.docker.com</td><td>Public images, including official ones</td></tr>
+  <tr><td>opencontainers.org</td><td>The open image and runtime specifications Docker follows</td></tr>
+</table>
+
+<p class="chapnum">Chapter 2</p>
+<h1>Why Docker exists</h1>
+
+<p>A program can run on one laptop and fail on another machine for reasons that have nothing to do with the program’s logic. One machine has Python 3.12 and the other has 3.10. A system library is present in development and missing on the server. PostgreSQL was assumed to be running, and it is not. That mismatch is the “it works on my machine” problem.</p>
+
+<p>Docker answers it by shipping the application and its runtime together. The image records which Python, which libraries, and which start command were tested. Anywhere the engine can run that image, the process starts from the same filesystem.</p>
+
+<h2>Where Docker earns its place</h2>
+<ul>
+  <li>A new teammate can start the API, the website, and the database with one command.</li>
+  <li>The artifact that passed tests is the artifact that is deployed. There is no second, hand-built server setup.</li>
+  <li>Services stop fighting over the same host packages and, with a little care, over the same ports.</li>
+  <li>A demo can be given to someone else without a long installation document.</li>
+</ul>
+
+<h2>Where Docker does not help</h2>
+<ul>
+  <li>It does not replace a virtual machine when you need a different kernel or a stronger isolation boundary.</li>
+  <li>It does not schedule a fleet of machines. That is an orchestrator’s job.</li>
+  <li>It does not fix an application that binds the wrong address, reads the wrong configuration, or fails its own tests.</li>
+</ul>
+
+<p class="chapnum">Chapter 3</p>
+<h1>How Docker actually works</h1>
+
+<p>You rarely talk to a container directly. You talk to a client. The client talks to the engine. The engine builds images, creates containers, and pulls or pushes registries.</p>
+
+<pre>You (CLI, Compose, or an IDE)
+        |
+        v
+Docker Engine (dockerd)
+        |
+        +-- builds --&gt; Images (read-only templates)
+        |
+        +-- runs  --&gt; Containers (processes with a writable layer)
+        |
+        v
+Registry (Docker Hub, GHCR, or a private registry)</pre>
+
+<table>
+  <tr><th>Piece</th><th>Role in the picture</th></tr>
+  <tr><td>CLI</td><td>Sends your command to the engine. It does not run the container itself.</td></tr>
+  <tr><td>Engine</td><td>The long-running service that does the work.</td></tr>
+  <tr><td>Image</td><td>The recipe’s result. It does not execute until a container is created from it.</td></tr>
+  <tr><td>Container</td><td>A process plus an isolated view of files, network, and other processes.</td></tr>
+  <tr><td>Registry</td><td>Where images are stored so another machine can pull them.</td></tr>
+</table>
+
+<h2>What the kernel is doing</h2>
+<p>On Linux, two kernel features do most of the isolation. A <strong>namespace</strong> gives the container its own process list, hostname, mount points, and network interfaces. A process inside the container can believe it is the only process, even though the host kernel is shared. A <strong>cgroup</strong> caps CPU, memory, and sometimes disk. If you set a memory limit, the kernel enforces it.</p>
+<p>On macOS and Windows, those Linux features are not the host kernel’s native model. Docker Desktop starts a small Linux virtual machine and runs the engine there. Port mapping still looks like <code>localhost</code> on your machine, because Desktop forwards the ports. The commands in these notes do not change.</p>
+
+<p class="chapnum">Chapter 4</p>
+<h1>Install and sanity-check</h1>
+
+<p>On macOS or Windows, install Docker Desktop. On Linux, install Docker Engine from the distribution, or Docker Desktop for Linux if you want the same application. After installation, the engine must be running before any command will succeed. A stopped whale icon, or a daemon that is not started, produces a connection error. That error means the client cannot find the engine. It does not mean your Dockerfile is wrong.</p>
+
+<pre>docker version
+docker info
+docker run --rm hello-world</pre>
+
+<p><code>docker version</code> prints a client section and a server section. Both must appear. If only the client appears, the engine is not reachable. <code>docker info</code> shows storage, the number of containers, and whether you are in a Linux VM. <code>hello-world</code> pulls a tiny image, starts a container, prints a short message, and exits. The <code>--rm</code> flag deletes that container when it exits, so it does not linger in <code>docker ps -a</code>.</p>
+
+<div class="callout"><p><strong>Compose v2.</strong> The command is <code>docker compose version</code>, with a space. The older <code>docker-compose</code> program, with a hyphen, is legacy. New projects, documentation, and interviews expect the spaced form. It is a plugin of the Docker CLI, not a separate product.</p></div>
+
+<p class="chapnum">Chapter 5</p>
+<h1>Images and containers</h1>
+
+<p>This distinction unlocks the rest of the subject. An image is a template. It sits on disk and does not run. A container is created from an image and is a running process, or a process that has stopped and can be started again. One image can produce many containers, the way one class can produce many objects. Changing a container does not rewrite the image. The next container from that image starts clean, unless you mount storage that lives outside the container.</p>
+
+<pre>python:3.12-slim          image
+    |-- container A       uvicorn listening on port 8000
+    |-- container B       a one-off test command</pre>
+
+<p>Images are stored as layers. Each instruction in a Dockerfile usually adds a layer. Layers are cached and can be shared between images. That is why a rebuild is fast when only the last instruction changed, and slow when an early instruction changed. Chapter 10 explains how to order instructions so the cache survives ordinary code edits.</p>
+
+<h2>Names and tags</h2>
+<p>An image name has a repository and a tag: <code>name:tag</code>. The tag is a label, not a guarantee of freshness.</p>
+<pre>python:3.12-slim
+ghcr.io/sindhu0016/gatepath-api:1.0.0</pre>
+<p>If you omit the tag, Docker uses <code>latest</code>. That word is only a default label. It is not “the newest image in the world,” and it moves whenever someone pushes again. In production, pin a version you have tested, or pin the image digest (<code>image@sha256:...</code>) when you need a bit-for-bit lock.</p>
+
+<p class="chapnum">Chapter 6</p>
+<h1>Your first containers</h1>
+
+<p>This command downloads the Nginx Alpine image if it is not already local, creates a container named <code>web</code>, and maps port 8080 on your machine to port 80 inside the container. Nginx listens on 80 inside its own network namespace. Your browser cannot see that namespace directly, so the <code>-p</code> flag publishes it.</p>
+
+<pre>docker run --name web -p 8080:80 nginx:alpine
+# open http://localhost:8080
+# Ctrl+C stops the container, because it is in the foreground</pre>
+
+<table>
+  <tr><th>Flag</th><th>Meaning</th></tr>
+  <tr><td><code>-d</code></td><td>Detached. The container keeps running and your terminal returns.</td></tr>
+  <tr><td><code>-p host:container</code></td><td>Publish a container port onto the host. The right-hand number is the port inside the container.</td></tr>
+  <tr><td><code>--name</code></td><td>A stable name. Without it, Docker assigns a random one.</td></tr>
+  <tr><td><code>--rm</code></td><td>Delete the container when it exits. Use this for experiments.</td></tr>
+  <tr><td><code>-e KEY=value</code></td><td>Set one environment variable for this run.</td></tr>
+  <tr><td><code>-v host:container</code></td><td>Mount a volume or a folder. See Chapter 12.</td></tr>
+  <tr><td><code>-it</code></td><td>Interactive terminal. <code>-i</code> keeps standard input open. <code>-t</code> allocates a terminal.</td></tr>
+  <tr><td><code>--network</code></td><td>Attach the container to a named network. See Chapter 13.</td></tr>
+</table>
+
+<p>A throwaway shell is the fastest way to see that you are inside a different filesystem:</p>
+<pre>docker run --rm -it ubuntu:24.04 bash</pre>
+<p>The prompt is a shell in the container. <code>exit</code> ends it, and <code>--rm</code> removes the container. Nothing you install in that shell survives, because the writable layer is deleted with the container. Persistent data needs a volume, which is a later chapter.</p>
+
+<p class="chapnum">Chapter 7</p>
+<h1>Essential commands</h1>
+
+<p>Learn this set before the long reference. Almost every later command is a variation of build, run, inspect, or remove.</p>
+
+<pre># images
+docker images                 # local images (docker image ls)
+docker pull python:3.12-slim
+docker rmi IMAGE              # delete an image (docker image rm)
+
+# containers
+docker ps                     # running only
+docker ps -a                  # running and stopped
+docker logs -f CONTAINER      # follow stdout and stderr
+docker exec -it CONTAINER sh  # shell in a container that is already running
+docker stop CONTAINER
+docker start CONTAINER
+docker rm CONTAINER
+docker rm -f CONTAINER        # stop, then remove
+
+# inspect and disk
+docker inspect CONTAINER
+docker stats
+docker system df              # disk used by images, containers, volumes
+docker system prune           # delete unused data; read the prompt</pre>
+
+<div class="callout"><p><strong>run versus exec.</strong> <code>docker run</code> creates a new container from an image. <code>docker exec</code> enters a container that already exists and is running. If the container has exited, <code>exec</code> fails. Start it, or use <code>docker run</code> with a different command.</p></div>
+
+<p><code>docker stop</code> sends a polite stop signal and waits, then kills the process if it does not exit. <code>docker rm</code> only removes a stopped container, unless you pass <code>-f</code>. Removing a container deletes its writable layer. It does not delete the image, and it does not delete a named volume.</p>
+
+<p class="chapnum">Chapter 8</p>
+<h1>Writing a Dockerfile</h1>
+
+<p>A Dockerfile is a recipe. Docker reads it from top to bottom and produces an image. The file is usually named <code>Dockerfile</code> with no extension, in the directory you will pass as the build context.</p>
+
+<pre>FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</pre>
+
+<table>
+  <tr><th>Instruction</th><th>When it runs</th><th>Role</th></tr>
+  <tr><td><code>FROM</code></td><td>Build</td><td>The starting image. Every Dockerfile begins here, except a scratch image used on purpose.</td></tr>
+  <tr><td><code>WORKDIR</code></td><td>Build, and it becomes the start directory at run</td><td>Sets the directory for later commands. Docker creates it if needed.</td></tr>
+  <tr><td><code>COPY</code></td><td>Build</td><td>Copies files from the build context into the image. Prefer this over <code>ADD</code>.</td></tr>
+  <tr><td><code>ADD</code></td><td>Build</td><td>Like <code>COPY</code>, and it can also fetch a URL or unpack an archive. That extra behaviour is usually a surprise. Use <code>COPY</code>.</td></tr>
+  <tr><td><code>RUN</code></td><td>Build</td><td>Runs a command while the image is being built. Package installs belong here.</td></tr>
+  <tr><td><code>ENV</code></td><td>Baked in, available at run</td><td>An environment variable stored in the image. Good for <code>PYTHONUNBUFFERED=1</code>. Not for passwords.</td></tr>
+  <tr><td><code>ARG</code></td><td>Build only</td><td>A variable you pass with <code>docker build --build-arg</code>. It is not automatically present when the container runs.</td></tr>
+  <tr><td><code>EXPOSE</code></td><td>Documentation</td><td>Records which port the process listens on. It does not publish the port. You still need <code>-p</code> or Compose <code>ports</code>.</td></tr>
+  <tr><td><code>CMD</code></td><td>Run</td><td>The default command. Easy to replace: <code>docker run IMAGE echo hi</code>.</td></tr>
+  <tr><td><code>ENTRYPOINT</code></td><td>Run</td><td>The executable. Extra arguments are appended. Use it when the image is a specific program.</td></tr>
+  <tr><td><code>USER</code></td><td>Run</td><td>Drops root. Real images should do this. See Chapter 18.</td></tr>
+  <tr><td><code>HEALTHCHECK</code></td><td>Run, repeatedly</td><td>A command Docker runs to ask whether the process is usable, not merely started.</td></tr>
+</table>
+
+<pre>docker build -t myapi:dev .
+docker run --rm -p 8000:8000 myapi:dev</pre>
+
+<p>The dot is the build context: the set of files sent to the engine. <code>.dockerignore</code> decides which of those files are left out. The <code>-t</code> flag names the resulting image.</p>
+
+<div class="callout"><p><strong>Exec form.</strong> Prefer the JSON form of <code>CMD</code> and <code>ENTRYPOINT</code>. The process then runs directly, so <code>docker stop</code> and Ctrl+C deliver the signal to your program. The shell form (<code>CMD uvicorn ...</code> without brackets) wraps the program in a shell, and the shell may swallow the signal. The container then takes longer to stop, or leaves a child process behind.</p></div>
+
+<p class="chapnum">Chapter 9</p>
+<h1>The .dockerignore file</h1>
+
+<p><code>.dockerignore</code> works like <code>.gitignore</code>, but for the build context. A file listed here is not sent to the engine, so <code>COPY . .</code> cannot place it in the image. That matters for size and for secrets.</p>
+
+<pre>.git
+.gitignore
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+.env
+.env.*
+README.md
+frontend/dist</pre>
+
+<p>Without this file, <code>COPY . .</code> can copy a virtual environment, <code>node_modules</code>, the Git history, and a <code>.env</code> file full of passwords. The image becomes enormous, builds slow down, and anyone who obtains the image can read the secrets from a layer. Put secrets in the environment at run time, not in the build context.</p>
+<p>Also ignore files that would confuse the build, such as a local <code>.venv</code> created on Windows or macOS. A virtual environment built on your laptop will not match the Linux image. Chapter 11 creates the virtual environment inside the builder stage instead.</p>
+
+<p class="chapnum">Chapter 10</p>
+<h1>Layers, cache, and BuildKit</h1>
+
+<p>Each of these instructions typically creates a layer. Docker reuses a layer when the instruction and the files it depends on are unchanged.</p>
+
+<pre>FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .</pre>
+
+<p>Dependencies change rarely. Application code changes often. Copying <code>requirements.txt</code> and installing it <em>before</em> <code>COPY . .</code> means an ordinary code edit does not rerun <code>pip</code>. If you copy the whole project first, every edit invalidates the install layer, and every build downloads packages again.</p>
+<p>Combine related shell commands in one <code>RUN</code>, and clean up in that same instruction. A later <code>RUN rm</code> does not shrink the earlier layer. The deleted files remain in the history.</p>
+
+<pre>RUN apt-get update \
+ &amp;&amp; apt-get install -y --no-install-recommends curl \
+ &amp;&amp; rm -rf /var/lib/apt/lists/*</pre>
+
+<p>BuildKit is the modern builder and the default in current Docker. It caches more precisely, can run independent stages in parallel, and understands <code>--target</code> so you can build one stage of a multi-stage file.</p>
+
+<pre>docker build -t myapi:dev .
+docker build --no-cache -t myapi:dev .
+docker build --target runtime -t myapi:dev .</pre>
+
+<p><code>--no-cache</code> is for when you suspect a stale layer, not for every build. Using it always throws away the speed layers are there to provide.</p>
+
+<p class="chapnum">Chapter 11</p>
+<h1>Multi-stage builds</h1>
+
+<p>A production image should contain the program and what it needs to run. It should not contain compilers, package caches, or test tools. A multi-stage Dockerfile uses one stage to build and a later stage to run. Only what you explicitly copy moves forward. The builder stage is discarded from the final image.</p>
+
+<h2>A React build served by Nginx</h2>
+<p>Node compiles the frontend. Nginx serves the static files. The running container has no Node and no <code>npm</code>.</p>
+
+<pre># syntax=docker/dockerfile:1
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:1.27-alpine AS runtime
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80</pre>
+
+<p><code>npm ci</code> installs exactly the lockfile. Copy the lockfile before the rest of the source so dependency installs stay cached. The Nginx configuration below sends <code>/api</code> to the Compose service named <code>api</code>, so the browser talks to one origin and Nginx talks to the API on the Docker network.</p>
+
+<pre>server {
+    listen 80;
+    root /usr/share/nginx/html;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    location /api/ {
+        proxy_pass http://api:8000/;
+    }
+}</pre>
+
+<pre>docker build -t gatepath-web:1.0.0 --target runtime ./frontend</pre>
+
+<h2>A Python build that copies a virtual environment</h2>
+<p>Compilers needed to build some wheels stay in the builder. The runtime image receives the virtual environment and the application code, then drops root.</p>
+
+<pre># syntax=docker/dockerfile:1
+FROM python:3.12-slim AS builder
+WORKDIR /app
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+FROM python:3.12-slim AS runtime
+WORKDIR /app
+RUN useradd --create-home --uid 10001 appuser
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+COPY --chown=appuser:appuser . .
+USER appuser
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</pre>
+
+<p>Keep the requirements copy before the application source so the <code>pip</code> layer stays cached. Do not copy a virtual environment from your laptop. The builder creates a Linux environment that matches the image. A single-stage Node image is often around a gigabyte. The Nginx runtime is tens of megabytes. Smaller images pull faster, scan more cleanly, and contain fewer packages to patch.</p>
+
+<p class="chapnum">Chapter 12</p>
+<h1>Volumes and bind mounts</h1>
+
+<p>A container has a thin writable layer on top of the image. Delete the container and that layer is gone. Databases, uploads, and anything else you must keep have to live outside that layer, in a volume or a bind mount.</p>
+
+<table>
+  <tr><th>Kind</th><th>What it is</th><th>Use it for</th></tr>
+  <tr><td>Named volume</td><td>A directory Docker manages, addressed by a name you choose.</td><td>Database files and persistent uploads.</td></tr>
+  <tr><td>Bind mount</td><td>A folder on your machine, mounted at a path inside the container.</td><td>Live source code during development.</td></tr>
+  <tr><td>Anonymous volume</td><td>Docker-managed storage with no name you chose.</td><td>Avoid it. It is easy to lose and hard to inspect.</td></tr>
+</table>
+
+<h2>A named volume for PostgreSQL</h2>
+<pre>docker volume create pgdata
+docker volume ls
+docker volume inspect pgdata
+
+docker run -d --name db \
+  -e POSTGRES_PASSWORD=devpass \
+  -v pgdata:/var/lib/postgresql/data \
+  postgres:16-alpine</pre>
+<p>The data remains after <code>docker rm db</code>, because it lives in <code>pgdata</code>, not in the container. <code>docker volume rm pgdata</code> deletes it. In Compose, declare <code>pgdata:</code> at the top level and mount <code>pgdata:/var/lib/postgresql/data</code> on the service. <code>docker compose down</code> keeps named volumes. <code>docker compose down -v</code> deletes them.</p>
+
+<h2>A bind mount for live code</h2>
+<pre>docker run --rm -p 8000:8000 \
+  -v "$(pwd)/backend:/app" \
+  -w /app \
+  myapi:dev \
+  uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload</pre>
+<p>The image still provides Python and the installed dependencies. The bind mount hides <code>/app</code> with your working tree, so the editor’s saves are visible immediately. <code>--reload</code> restarts the process when those files change. This pattern is for development. A production container should run the code that was copied into the image, so the running bits match the built bits.</p>
+
+<div class="callout"><p><strong>Do not bind-mount a production database from a laptop.</strong> A bind-mounted PostgreSQL directory from macOS or Windows is slow and can be damaged by an abrupt stop. A laptop disk is not a backup. Production data belongs in a named volume on the server, or in a managed database. Do not publish the data directory “so you can see the files.” Inspect with <code>docker exec</code> and take backups with <code>pg_dump</code>.</p></div>
+
+<p class="chapnum">Chapter 13</p>
+<h1>Networking</h1>
+
+<p>On the default bridge network, containers do not get reliable DNS names for each other. Create a user-defined bridge and Docker’s embedded DNS resolves container names, and Compose service names, to the right addresses.</p>
+
+<pre>docker network create appnet
+
+docker run -d --name db --network appnet \
+  -e POSTGRES_PASSWORD=devpass \
+  -e POSTGRES_DB=gatepath \
+  postgres:16-alpine
+
+docker run -d --name api --network appnet \
+  -e DATABASE_URL=postgresql://postgres:devpass@db:5432/gatepath \
+  -p 8000:8000 \
+  myapi:dev</pre>
+
+<p>The API connects to the hostname <code>db</code> on port 5432. That port was not published to your laptop, and it does not need to be. Containers on the same user-defined network use the container port directly. <code>-p</code> exists for programs on the host: your browser, a database GUI, or a colleague’s machine. Publishing every internal port is how databases end up exposed on the internet.</p>
+
+<div class="callout"><p><strong>localhost means “this container.”</strong> Inside the API container, <code>localhost:5432</code> is the API itself, not PostgreSQL. The database hostname is <code>db</code>. On your laptop, <code>localhost:8000</code> is the published API port. Mixing those two meanings is the most common Compose failure.</p></div>
+
+<table>
+  <tr><th>Driver</th><th>When to use it</th></tr>
+  <tr><td><code>bridge</code></td><td>The normal choice. Prefer a user-defined bridge for any multi-container application.</td></tr>
+  <tr><td><code>host</code></td><td>The container shares the host network. There is no port isolation and no <code>-p</code>. Rare. Sometimes used for a tool that must see host ports directly.</td></tr>
+  <tr><td><code>none</code></td><td>No network. Useful for a one-off job that must not talk to anything.</td></tr>
+</table>
+
+<pre>docker network ls
+docker network inspect appnet
+docker network rm appnet</pre>
+<p>You can remove a network only when no container is still attached to it.</p>
+
+<p class="chapnum">Chapter 14</p>
+<h1>Environment, secrets, and config</h1>
+
+<p>Configuration that changes between a laptop and a server belongs in the environment, not in the image. The image should be the same artifact everywhere. The environment tells it which database to call.</p>
+
+<pre>docker run -e DATABASE_URL=postgresql://postgres:devpass@db:5432/gatepath myapi:dev
+docker run --env-file ./secrets.env myapi:dev</pre>
+
+<p><code>-e</code> sets one variable. <code>--env-file</code> reads <code>KEY=value</code> lines. The file stays on the host. It enters the image only if a Dockerfile also copies it.</p>
+
+<div class="callout"><p><strong>Never copy <code>.env</code> into the image.</strong> If that file is in the build context and you <code>COPY . .</code>, the values become a layer. <code>docker history</code> and a later <code>printenv</code> can reveal them. List <code>.env</code> in <code>.dockerignore</code>. Pass values at run time.</p></div>
+
+<table>
+  <tr><th></th><th><code>ARG</code></th><th><code>ENV</code></th></tr>
+  <tr><td>When it exists</td><td>Build time. Pass it with <code>--build-arg</code>.</td><td>Stored in the image and present when the container runs.</td></tr>
+  <tr><td>Good for</td><td>A version label or a feature flag of the build.</td><td>Non-secret settings such as <code>PYTHONUNBUFFERED=1</code>.</td></tr>
+  <tr><td>Bad for</td><td>Passwords. Build arguments can show up in image history.</td><td>Passwords. They are baked into every copy of the image.</td></tr>
+</table>
+
+<p>In Compose, <code>env_file</code> points at a file on the machine running Compose. <code>environment</code> sets individual keys and overrides the file. <code>${POSTGRES_PASSWORD}</code> is substituted from the shell or from a <code>.env</code> file sitting next to <code>compose.yaml</code>. That file is for Compose’s own substitution. It is not automatically visible inside the container unless you pass it. For production, prefer a secret store, or secret files mounted at run time. Do not commit real passwords.</p>
+
+<p class="chapnum">Chapter 15</p>
+<h1>Docker Compose</h1>
+
+<p>Compose runs several containers as one application. You describe services in YAML. Compose creates a project network, starts the containers, and gives each service a DNS name equal to its service name. Use <code>docker compose</code> with a space.</p>
+<p>The file below matches the mini project in Chapter 20: PostgreSQL 16, a FastAPI service, and a frontend served by Nginx.</p>
+
+<pre>services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpass}
+      POSTGRES_DB: gatepath
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gatepath"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No ports. The API reaches db:5432 on the Compose network.
+    # Publish 5432 only if a local GUI needs it, and bind it to 127.0.0.1.
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-devpass}@db:5432/gatepath
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  web:
+    build: ./frontend
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:</pre>
+
+<p><code>depends_on</code> with <code>condition: service_healthy</code> waits until PostgreSQL accepts connections. Waiting only until the container has started is too early: the database process can still be initialising, and the API will crash on the first connection. The web service waits until the API container has started. It does not, in this file, wait for an API health check. Add one if the frontend fails when it races the API.</p>
+
+<pre>docker compose up --build    # build, start, and show logs
+docker compose up -d          # detached
+docker compose logs -f        # all services
+docker compose logs -f api    # one service
+docker compose ps
+docker compose exec api sh
+docker compose down           # stop and remove containers; keep volumes
+docker compose down -v        # also delete named volumes, including Postgres data</pre>
+
+<p>From the API container, the hostname <code>db</code> works. From the web container, the hostname <code>api</code> works. You do not use container IDs. A file named <code>compose.yaml</code> in the current directory is picked up automatically. <code>docker-compose.yml</code> still works. New projects should use <code>compose.yaml</code>.</p>
+
+<p class="chapnum">Chapter 16</p>
+<h1>Health checks, restart, and logs</h1>
+
+<p>A container can be “running” while the program inside is stuck or still starting. A health check is a command Docker repeats to decide whether the service is usable. Compose uses that result for <code>service_healthy</code>.</p>
+
+<pre>HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:8000/health || exit 1</pre>
+
+<p><code>start-period</code> is grace time while the process boots. Failures during that window do not count toward <code>retries</code>. The check calls <code>127.0.0.1</code> because it runs inside the container, asking the local process whether it is up. Python slim images do not include <code>curl</code>. Either install it with <code>--no-install-recommends</code>, or avoid the extra package:</p>
+
+<pre>HEALTHCHECK CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"</pre>
+
+<p>Keep <code>/health</code> cheap. It should answer that the process is up, without depending on the database. A separate <code>/ready</code> route can check PostgreSQL. Use the cheap route for the Docker health check if you do not want the container marked unhealthy every time the database blips. Use the ready route when traffic should wait for a real dependency.</p>
+
+<table>
+  <tr><th>Restart policy</th><th>Behaviour</th></tr>
+  <tr><td><code>no</code></td><td>The default. When the process exits, it stays down.</td></tr>
+  <tr><td><code>on-failure</code></td><td>Restart only after a non-zero exit. You can cap the number of retries.</td></tr>
+  <tr><td><code>always</code></td><td>Restart after any exit, and when the engine starts. A clean exit still comes back.</td></tr>
+  <tr><td><code>unless-stopped</code></td><td>Like <code>always</code>, except a container you stopped yourself stays stopped across a reboot.</td></tr>
+</table>
+
+<pre>docker run -d --restart unless-stopped --name api myapi:1.0.0</pre>
+<p>In Compose, set <code>restart: unless-stopped</code> on services that should survive a crash. Leave one-shot jobs on <code>no</code>.</p>
+
+<h2>Logs</h2>
+<p>Write logs to standard output and standard error. Docker collects those streams. A log file inside the container disappears with the writable layer, and <code>docker logs</code> will not show it.</p>
+<pre>docker logs -f api
+docker logs --tail 100 api
+docker compose logs -f --tail=200</pre>
+<p>Uvicorn already prints to standard output. In production, send that stream to your log system. Do not treat <code>docker exec</code> and <code>cat</code> of a file as the logging design.</p>
+
+<p class="chapnum">Chapter 17</p>
+<h1>Pushing to a registry</h1>
+
+<p>An image you built exists only on that machine until you push it. A registry stores images so continuous integration, a teammate, or a server can pull the same bits. Tag a version you can roll back to. <code>latest</code> moves, so yesterday’s latest is not a stable name.</p>
+
+<h2>Docker Hub</h2>
+<p>Hub names look like <code>username/repository:tag</code>.</p>
+<pre>docker login
+docker tag myapi:1.0.0 sindhu0016/gatepath-api:1.0.0
+docker push sindhu0016/gatepath-api:1.0.0
+docker pull sindhu0016/gatepath-api:1.0.0</pre>
+
+<h2>GitHub Container Registry</h2>
+<pre>echo "$GITHUB_TOKEN" | docker login ghcr.io -u Sindhu0016 --password-stdin
+docker tag myapi:1.0.0 ghcr.io/sindhu0016/gatepath-api:1.0.0
+docker push ghcr.io/sindhu0016/gatepath-api:1.0.0
+docker pull ghcr.io/sindhu0016/gatepath-api:1.0.0</pre>
+<p>GHCR packages are often private. The token needs permission to read and write packages. Also push the Git commit so a bad release can be pinned back:</p>
+<pre>docker tag myapi:1.0.0 ghcr.io/sindhu0016/gatepath-api:sha-abc1234
+docker push ghcr.io/sindhu0016/gatepath-api:sha-abc1234</pre>
+<p>A version tag is the everyday name. A digest (<code>image@sha256:...</code>) is the lock you use when two builds must be identical even if someone moves the tag.</p>
+
+<p class="chapnum">Chapter 18</p>
+<h1>Security basics</h1>
+
+<p>A container is a process with isolation, not a magic boundary. Treat it as a program that should run with as little privilege as it needs.</p>
+
+<h2>Do not run as root</h2>
+<p>Many official images default to root. If that process is compromised, root inside the container is a poor place to start, and some mounts can map that user onto a powerful user on the host.</p>
+<pre>RUN useradd --create-home --uid 10001 appuser
+USER appuser</pre>
+<p>Create the user, give it ownership of the files it must write, then switch with <code>USER</code>. Bind-mounted files may need the same user id on the host. Named volumes can be initialised by the image’s user.</p>
+
+<h2>Small bases and pinned tags</h2>
+<ul>
+  <li>Prefer <code>python:3.12-slim</code>, <code>node:22-alpine</code>, and <code>nginx:1.27-alpine</code> over an untagged <code>python</code> or a full Ubuntu image.</li>
+  <li>Pin a tag you have tested. <code>3.12-slim</code> is a decision. <code>latest</code> is not.</li>
+  <li>Alpine is small and uses musl. Some Python wheels expect glibc. Debian slim is the calmer default for Python. Alpine is a good default for Nginx and for many Node builds.</li>
+</ul>
+
+<pre>docker scout cves myapi:1.0.0</pre>
+<p>Docker Scout reports known vulnerabilities in the packages you shipped. The fix is usually a newer base image or a newer library, followed by a rebuild. Trivy is a common scanner in continuous integration.</p>
+
+<h2>Secrets and published ports</h2>
+<p>Anything you <code>COPY</code> or pass as a build <code>ARG</code> can leak through image history. Pass secrets at run time. Do not publish PostgreSQL on a cloud virtual machine with <code>-p 5432:5432</code>. Leave it on the internal network. If a GUI on your laptop needs it, bind the port to loopback only:</p>
+<pre>ports:
+  - "127.0.0.1:5432:5432"</pre>
+<p>That listens on the host’s loopback interface, not on every network interface.</p>
+
+<h2>Optional extra limits</h2>
+<pre>services:
+  api:
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp</pre>
+<p><code>read_only</code> makes the container filesystem read-only. Add a temporary filesystem at <code>/tmp</code> if the program needs scratch space. <code>no-new-privileges</code> blocks a process from gaining privileges through setuid. These are additional controls. They do not replace a non-root user or the rule about secrets.</p>
+
+<p class="chapnum">Chapter 19</p>
+<h1>Debugging when things break</h1>
+
+<p>Work down this list. Most reports that “Docker is broken” are one of these mismatches.</p>
+
+<h2>1. Is the container running?</h2>
+<pre>docker ps -a
+docker compose ps</pre>
+<p><code>Exited (1)</code> means the process crashed. A status that keeps returning to “restarting” means a restart policy is looping a crash. Read the logs before you rebuild.</p>
+
+<h2>2. Read the logs</h2>
+<pre>docker logs --tail 200 api
+docker compose logs -f api</pre>
+<p>Python tracebacks and Nginx errors appear here when the program writes to standard output. If the logs are empty, the program is writing to a file inside the container instead.</p>
+
+<h2>3. Open a shell when the command exits immediately</h2>
+<pre>docker run --rm -it --entrypoint sh myapi:dev
+docker compose run --entrypoint sh api</pre>
+<p>You get a shell even if the normal command crashes. Check files, run <code>printenv</code>, and try the start command by hand. <code>docker exec</code> works only while the container is still running.</p>
+
+<h2>4. Check the bind address</h2>
+<p>Uvicorn must listen on <code>0.0.0.0</code> to accept connections from outside the container: your browser, Nginx, and other services. Binding <code>127.0.0.1</code> makes the application reachable only from inside that container. The symptom is a published port in <code>docker ps</code> and a browser that cannot connect.</p>
+
+<h2>5. Check the hostname</h2>
+<p>From the API, PostgreSQL is <code>db</code>, not <code>localhost</code>. A typo such as <code>postgres</code> when the service is named <code>db</code> produces a name-resolution error. Confirm with:</p>
+<pre>docker compose exec api getent hosts db</pre>
+
+<h2>6. Check permissions and image size</h2>
+<p>If the process runs as user id 10001 and a bind-mounted folder is owned by you, writes fail with permission denied. Do not write caches into that mount, or align the user ids, or keep generated files in a named volume. If the image is suddenly huge, <code>.dockerignore</code> is probably missing and a virtual environment or <code>node_modules</code> was copied in. <code>docker history myapi:dev</code> shows which layer grew.</p>
+
+<pre>docker inspect api
+docker compose config    # the YAML after variable substitution
+docker system df</pre>
+<p><code>docker compose config</code> shows the file Compose will actually use. It catches a wrong <code>DATABASE_URL</code> before you blame the application.</p>
+
+<p class="chapnum">Chapter 20</p>
+<h1>Mini project: FastAPI and React</h1>
+
+<p>This is a small layout you can run. The Compose file in Chapter 15 is the one for this tree.</p>
+
+<pre>gatepath/
+  compose.yaml
+  backend/
+    Dockerfile
+    .dockerignore
+    requirements.txt
+    app/
+      main.py          # FastAPI: /health, and routes that use Postgres
+  frontend/
+    Dockerfile         # Node 22 build, Nginx 1.27 runtime
+    nginx.conf
+    package.json
+    src/</pre>
+
+<h2>Backend image</h2>
+<pre>FROM python:3.12-slim
+WORKDIR /app
+RUN useradd --create-home --uid 10001 appuser
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=appuser:appuser . .
+USER appuser
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</pre>
+<p><code>backend/.dockerignore</code> should exclude <code>.venv</code>, <code>__pycache__</code>, <code>.env</code>, and tests you do not want in the image. A minimum <code>requirements.txt</code> is <code>fastapi</code>, <code>uvicorn[standard]</code>, and <code>psycopg[binary]</code>. The application reads <code>DATABASE_URL</code> from the environment. It listens on <code>0.0.0.0</code>.</p>
+<p>For a smaller and cleaner image, replace this single stage with the multi-stage Python file in Chapter 11. The single stage above is easier to read the first time. The multi-stage file is the one to keep.</p>
+
+<h2>Frontend image</h2>
+<p>Use the multi-stage Dockerfile in Chapter 11. Nginx serves the built files and proxies <code>/api</code> to <code>http://api:8000/</code>.</p>
+
+<h2>Run and stop</h2>
+<pre>docker compose up --build</pre>
+<ul>
+  <li>Website: <code>http://localhost:8080</code></li>
+  <li>API health, if you want to call it directly: <code>http://localhost:8000/health</code></li>
+  <li>PostgreSQL is not published. The API reaches it at the hostname <code>db</code>.</li>
+</ul>
+<p>You may keep local overrides in <code>backend/.env</code>. Keep that file out of Git and out of the image. The Compose <code>environment</code> block already injects <code>DATABASE_URL</code>. Stop with <code>docker compose down</code>. Delete the database volume, when you mean to, with <code>docker compose down -v</code>.</p>
+
+<p class="chapnum">Chapter 21</p>
+<h1>Command reference</h1>
+
+<pre># build, run, stop
+docker build -t NAME:TAG .
+docker run --rm -p 8000:8000 NAME:TAG
+docker run -d --name api NAME:TAG
+docker stop api &amp;&amp; docker start api
+docker rm -f api
+
+# shell and logs
+docker exec -it api sh
+docker logs -f api
+
+# Compose v2
+docker compose up --build
+docker compose up -d
+docker compose logs -f
+docker compose ps
+docker compose exec api sh
+docker compose down
+docker compose down -v
+
+# inventory
+docker images
+docker ps -a
+docker volume ls
+docker network ls
+docker inspect api
+docker compose config
+docker system df
+
+# cleanup is destructive; read the prompt
+docker system prune
+docker system prune -a --volumes</pre>
+
+<p><code>docker system prune</code> removes stopped containers, unused networks, and dangling images. Adding <code>-a</code> removes images not used by a container. Adding <code>--volumes</code> removes unused volumes, including database data you may still want. Run <code>docker system df</code> first, and do not prune volumes unless you intend to delete that data.</p>
+
+<p class="chapnum">Chapter 22</p>
+<h1>Interview questions</h1>
+
+<h2>What is the difference between an image and a container?</h2>
+<p>An image is a read-only template: a filesystem, a default command, and metadata. A container is a running or stopped instance of that image, with a writable layer on top. One image can start many containers. Deleting a container does not delete the image.</p>
+
+<h2>How is a container different from a virtual machine?</h2>
+<p>A virtual machine virtualises hardware and boots a guest operating system. A container shares the host kernel and isolates a process with namespaces and cgroups. Containers start faster and use less memory. They are not the same isolation boundary as a virtual machine.</p>
+
+<h2>What does EXPOSE do?</h2>
+<p>It documents the port the process listens on. It does not publish that port on the host. Publishing is <code>-p</code> or Compose <code>ports</code>.</p>
+
+<h2>What is the difference between CMD and ENTRYPOINT?</h2>
+<p><code>CMD</code> is the default command and is easy to replace. <code>ENTRYPOINT</code> is the executable; extra arguments are appended to it. A common pattern is an entrypoint binary with <code>CMD</code> supplying default flags. Use the JSON exec form so stop signals reach the process.</p>
+
+<h2>Why is an image huge?</h2>
+<p>Typical causes: no <code>.dockerignore</code>, so <code>.git</code>, <code>node_modules</code>, or <code>.venv</code> were copied in; a full base image; compilers left in the final stage; no multi-stage build; package-manager caches not removed in the same <code>RUN</code>.</p>
+
+<h2>How do containers find each other?</h2>
+<p>Place them on a user-defined bridge. Compose does this automatically. Use the service name as the hostname and use the container port. <code>-p</code> is for the host, not for traffic between containers.</p>
+
+<h2>When do you use a bind mount, and when a named volume?</h2>
+<p>A bind mount is a host path. It is right for live source code. A named volume is storage Docker manages. It is right for database files. Do not bind-mount a production database from a laptop.</p>
+
+<h2>The application works locally and fails in Docker. What do you check?</h2>
+<p>The process may be binding <code>127.0.0.1</code> instead of <code>0.0.0.0</code>. It may be calling <code>localhost</code> instead of the service name <code>db</code>. A dependency may be missing from the image. Environment variables may not have been passed at run time. A file that exists on the laptop may never have been copied. Read the logs, then <code>docker compose config</code>, then a shell in the image.</p>
+
+<h2>Why did the layer cache break?</h2>
+<p>An early <code>COPY . .</code> invalidates every later layer when any file changes. Copy the lockfile, install dependencies, and copy the source last. A changed <code>RUN</code> line, <code>--no-cache</code>, or a build argument used before a <code>RUN</code> also forces that step to run again.</p>
+
+<p class="chapnum">Chapter 23</p>
+<h1>What to learn next</h1>
+
+<p>At this point you can containerise a FastAPI and React application, describe it in Compose, and push a tagged image. Continue in this order.</p>
+<ol>
+  <li><strong>Compose Watch.</strong> <code>docker compose watch</code> syncs files and rebuilds on change, which is often cleaner than a pile of development bind mounts.</li>
+  <li><strong>A build pipeline.</strong> On a Git tag, build the image, scan it, and push it to GHCR with both a version tag and a commit tag.</li>
+  <li><strong>Scanning in that pipeline.</strong> Docker Scout or Trivy should fail the build on critical vulnerabilities you are not prepared to ship.</li>
+  <li><strong>Kubernetes, only after Docker is fluent.</strong> Kubernetes schedules containers across machines. Pods, Services, and Deployments are easier once images, ports, health checks, and configuration already feel ordinary. If Compose is still unclear, Kubernetes will hide the same bugs behind more objects.</li>
+</ol>
+
+<p class="small">Study notes, September 2026. Dasari Sindhu. Compose v2: <code>docker compose</code>, with a space.</p>
+
+</body>
+</html>
